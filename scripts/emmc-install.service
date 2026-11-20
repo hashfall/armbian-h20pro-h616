@@ -1,0 +1,18 @@
+[Unit]
+Description=Instala Armbian no eMMC a partir do cartao SD
+Documentation=file:/boot/emmc-install/README.txt
+After=local-fs.target systemd-remount-fs.service
+Before=multi-user.target armbian-firstrun.service
+ConditionPathExists=/boot/emmc-install/enabled
+ConditionPathExists=!/boot/emmc-install/done
+ConditionPathExists=!/boot/emmc-install/failed
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/emmc-install.sh
+TimeoutStartSec=0
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

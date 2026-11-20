@@ -1,0 +1,40 @@
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -1492,6 +1492,17 @@
+ 
+ void dw_hdmi_phy_i2c_set_addr(struct dw_hdmi *hdmi, u8 address)
+ {
++	/*
++	 * The Allwinner BSP explicitly selects the PHY I2C interface
++	 * (I2C_JTAGZ) before every PHY configuration.  Do the same here;
++	 * without it the PHY register writes can be silently discarded and
++	 * the PLL never locks.
++	 */
++	if (of_device_is_compatible(hdmi->dev->of_node,
++				    "allwinner,sun50i-h616-dw-hdmi"))
++		hdmi_writeb(hdmi, HDMI_PHY_JTAG_CONFIG_I2C_JTAGZ,
++			    HDMI_PHY_JTAG_CONFIG_ADDR);
++
+ 	hdmi_phy_test_clear(hdmi, 1);
+ 	hdmi_writeb(hdmi, address, HDMI_PHY_I2CM_SLAVE_ADDR);
+ 	hdmi_phy_test_clear(hdmi, 0);
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
+@@ -371,6 +371,7 @@
+ 
+ /* HDMI Master PHY Registers */
+ #define HDMI_PHY_I2CM_SLAVE_ADDR                0x3020
++#define HDMI_PHY_JTAG_CONFIG_ADDR               0x3034
+ #define HDMI_PHY_I2CM_ADDRESS_ADDR              0x3021
+ #define HDMI_PHY_I2CM_DATAO_1_ADDR              0x3022
+ #define HDMI_PHY_I2CM_DATAO_0_ADDR              0x3023
+@@ -896,6 +897,9 @@
+ 	HDMI_PHY_HPD = 0x02,
+ 	HDMI_PHY_TX_PHY_LOCK = 0x01,
+ 
++/* PHY_JTAG_CONFIG field values */
++	HDMI_PHY_JTAG_CONFIG_I2C_JTAGZ = 0x10,
++
+ /* PHY_I2CM_SLAVE_ADDR field values */
+ 	HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2 = 0x69,
+ 	HDMI_PHY_I2CM_SLAVE_ADDR_HEAC_PHY = 0x49,
