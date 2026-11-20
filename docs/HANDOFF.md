@@ -143,3 +143,42 @@ PHY lock loop: i=.. val=.. stat0=..
 - Não escreva em `mmcblk2`, `mmcblk2boot0/1`.
 - Confirme `findmnt -no SOURCE /` = `/dev/mmcblk0p1` antes de qualquer ajuste.
 - Sempre `sync` + `umount` antes de tirar o SD do PC.
+
+## 11. Registro — 2026-11-20 (última gravação no SD)
+
+**Build instalado no SD:** `6.18.64` hash
+`6.18.64-Sfd7c-D7c7d-Pf987-C42c5-Hfaa2-HK01ba-Vc222-Bdf9b-R448a`
+(`linux-image`/`linux-dtb` em `artifacts/`).
+
+Patches aplicados nesse build:
+
+- `0003` pad-select;
+- `0005` tabelas stock (97 entradas, phy301);
+- `0006` `JTAG_PHY_CONFIG = 0x10`;
+- `0010` debug/readback;
+- `0011` pulso de reset da PHY.
+
+**Evidência de gravação (PC):**
+
+- `dpkg -i` no SD concluiu, `update-initramfs`/`uInitrd` gerados;
+- DTB gravado com md5 `b0b9993961fbaa05bd7701fd97212522`, igual ao
+  `dtb/sun50i-h313-x96q-lpddr3-final.dtb`;
+- script terminou com `INSTALACAO_OK` e desmontou o SD.
+
+Uma tentativa posterior de montar `/dev/mmcblk0p1` no PC falhou com
+`can't read superblock` **porque o cartão já estava na caixa** (dmesg:
+`mmc0: card 0001 removed`). Não é falha de gravação.
+
+**Pendente/observação:** a caixa subiu com esse SD, mas a leitura do UART
+voltou apenas sequências de terminal (`[!p]104...[6n`), sem prompt nem log.
+Falta capturar:
+
+```
+uname -r
+tail -400 /var/log/kern.log | grep -iE 'PHY (init state|power_on|lock loop|readback)|PLL|EVENT|EDID'
+cat /sys/class/drm/card0-HDMI-A-1/status
+```
+
+para confirmar se o PLL travou com as tabelas stock + select I2C/JTAG.
+
+**Regra:** não iniciar outro build até registrar/avaliar este resultado.
