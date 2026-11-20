@@ -2,3 +2,4 @@
 artifacts/*.deb
 *.zip
 .ruff_cache/
+armbian-build/
