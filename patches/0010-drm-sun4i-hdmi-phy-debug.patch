@@ -1,0 +1,94 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Local Debug <debug@localhost>
+Date: Fri, 20 Nov 2026 00:00:00 +0000
+Subject: [PATCH] drm: bridge: dw-hdmi: debug PHY PLL/i2c
+
+Print PHY state, PLL wait, i2c failures and read back PHY registers.
+
+Signed-off-by: Local Debug <debug@localhost>
+---
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -1357,7 +1357,10 @@
+ 		    HDMI_PHY_I2CM_DATAO_0_ADDR);
+ 	hdmi_writeb(hdmi, HDMI_PHY_I2CM_OPERATION_ADDR_WRITE,
+ 		    HDMI_PHY_I2CM_OPERATION_ADDR);
+-	hdmi_phy_wait_i2c_done(hdmi, 1000);
++	if (!hdmi_phy_wait_i2c_done(hdmi, 1000))
++		dev_warn(hdmi->dev,
++			 "PHY i2c write failed: addr=0x%02x data=0x%04x\n",
++			 addr, data);
+ }
+ EXPORT_SYMBOL_GPL(dw_hdmi_phy_i2c_write);
+ 
+@@ -1544,15 +1547,30 @@
+ 	dw_hdmi_phy_gen2_txpwron(hdmi, 1);
+ 	dw_hdmi_phy_gen2_pddq(hdmi, 0);
+ 
++	dev_info(hdmi->dev,
++		 "PHY power_on: mpixel=%lu mtmds=%lu conf0=%02x stat0=%02x clkdis=%02x phyrstz=%02x\n",
++		 hdmi->hdmi_data.video_mode.mpixelclock,
++		 hdmi->hdmi_data.video_mode.mtmdsclock,
++		 hdmi_readb(hdmi, HDMI_PHY_CONF0),
++		 hdmi_readb(hdmi, HDMI_PHY_STAT0),
++		 hdmi_readb(hdmi, HDMI_MC_CLKDIS),
++		 hdmi_readb(hdmi, HDMI_MC_PHYRSTZ));
++
+ 	/* Wait for PHY PLL lock */
+-	for (i = 0; i < 5; ++i) {
++	for (i = 0; i < 100; ++i) {
+ 		val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
+ 		if (val)
+ 			break;
+ 
+-		usleep_range(1000, 2000);
++		usleep_range(5000, 6000);
+ 	}
+ 
++	dev_info(hdmi->dev,
++		 "PHY lock loop: i=%u val=%u conf0=%02x stat0=%02x clkdis=%02x\n",
++		 i, val, hdmi_readb(hdmi, HDMI_PHY_CONF0),
++		 hdmi_readb(hdmi, HDMI_PHY_STAT0),
++		 hdmi_readb(hdmi, HDMI_MC_CLKDIS));
++
+ 	if (!val) {
+ 		dev_err(hdmi->dev, "PHY PLL failed to lock\n");
+ 		return -ETIMEDOUT;
+@@ -1567,6 +1585,18 @@
+  * information the DWC MHL PHY has the same register layout and is thus also
+  * supported by this function.
+  */
++static u16 dw_hdmi_phy_i2c_read(struct dw_hdmi *hdmi, unsigned char addr)
++{
++	hdmi_writeb(hdmi, 0xFF, HDMI_IH_I2CMPHY_STAT0);
++	hdmi_writeb(hdmi, addr, HDMI_PHY_I2CM_ADDRESS_ADDR);
++	hdmi_writeb(hdmi, HDMI_PHY_I2CM_OPERATION_ADDR_READ,
++		    HDMI_PHY_I2CM_OPERATION_ADDR);
++	if (!hdmi_phy_wait_i2c_done(hdmi, 1000))
++		return 0xffff;
++	return (hdmi_readb(hdmi, HDMI_PHY_I2CM_DATAI_1_ADDR) << 8) |
++	       hdmi_readb(hdmi, HDMI_PHY_I2CM_DATAI_0_ADDR);
++}
++
+ static int hdmi_phy_configure_dwc_hdmi_3d_tx(struct dw_hdmi *hdmi,
+ 		const struct dw_hdmi_plat_data *pdata,
+ 		unsigned long mpixelclock)
+@@ -1616,6 +1646,16 @@
+ 	dw_hdmi_phy_i2c_write(hdmi, HDMI_3D_TX_PHY_CKCALCTRL_OVERRIDE,
+ 			      HDMI_3D_TX_PHY_CKCALCTRL);
+ 
++	dev_info(hdmi->dev,
++		 "PHY readback: 00=%04x 05=%04x 06=%04x 09=%04x 0e=%04x 10=%04x 13=%04x\n",
++		 dw_hdmi_phy_i2c_read(hdmi, HDMI_3D_TX_PHY_PWRCTRL),
++		 dw_hdmi_phy_i2c_read(hdmi, HDMI_3D_TX_PHY_CKCALCTRL),
++		 dw_hdmi_phy_i2c_read(hdmi, HDMI_3D_TX_PHY_CPCE_CTRL),
++		 dw_hdmi_phy_i2c_read(hdmi, HDMI_3D_TX_PHY_CKSYMTXCTRL),
++		 dw_hdmi_phy_i2c_read(hdmi, HDMI_3D_TX_PHY_VLEVCTRL),
++		 dw_hdmi_phy_i2c_read(hdmi, HDMI_3D_TX_PHY_CURRCTRL),
++		 dw_hdmi_phy_i2c_read(hdmi, HDMI_3D_TX_PHY_PLLPHBYCTRL));
++
+ 	return 0;
+ }
+ 
+-- 
+2.51.0

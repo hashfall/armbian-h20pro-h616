@@ -53,25 +53,30 @@ loop. Use a variante **X96Q LPDDR3**.
 
 O build do kernel fica no diretório irmão `../armbian-build/`:
 
-- patches de kernel: `../armbian-build/userpatches/kernel/sunxi-6.18/`
-- já existem lá: `0003-drm-sun4i-tcon-pad-select.patch` e
-  `0004-drm-sun4i-h616-hdmi-phy.patch`
-- os patches deste repositório (`patches/0005` e `patches/0006`) ainda
-  precisam ser copiados para essa pasta antes de compilar
+Todos os patches estão em `patches/` e são copiados para
+`../armbian-build/userpatches/kernel/archive/sunxi-6.18/` por
+`scripts/build-kernel.sh`. Ordem (léxica): **0003 → 0005 → 0006 → 0010 →
+0011**.
 
-Ordem: **0003 → 0004 → 0005 → 0006**.
+- `0003` — pad-select do TCON (o kernel 6.18 já faz via quirk; inofensivo).
+- `0005` — substitui as tabelas H616 pelas **97 entradas** extraídas do
+  Android stock (PHY phy301).
+- `0006` — seleciona a interface I2C da PHY (`JTAG_PHY_CONFIG = 0x10`), que o
+  stock escreve antes de cada configuração; sem isso os writes podem ser
+  descartados em silêncio.
+- `0010` — diagnóstico: readback I2C e estado da PHY no power-on.
+- `0011` — pulso real de reset na PHY antes de configurar.
 
-- `0005` substitui as tabelas H616 pelas 97 entradas extraídas do Android
-  stock (PHY phy301).
-- `0006` seleciona a interface I2C do PHY (`JTAG_PHY_CONFIG = 0x10`), que o
-  stock escreve antes de cada configuração. É o candidato principal para o
-  erro `PHY PLL failed to lock`.
-- `0006` só atua se o nó HDMI mantiver o compatible
-  `allwinner,sun50i-h616-dw-hdmi`.
+`0006` só atua se o nó HDMI mantiver o compatible
+`allwinner,sun50i-h616-dw-hdmi`.
 
 Detalhes da engenharia reversa: `docs/hdmi-stock-re.md`.
 Tabela extraída: `docs/h616_phy_tables.c` (referência gerada; o patch real é
 o `0005`).
+
+Para reproduzir em outro PC (host, build, instalação no SD, diagnóstico e
+estado atual), siga **`docs/HANDOFF.md`**. Kernel pronto em `artifacts/` e DTB
+final em `dtb/`.
 
 ## Ethernet e Wi-Fi
 
@@ -115,6 +120,16 @@ normal. Em um SD antigo, remova `/boot/emmc-install/enabled` antes de bootar.
 
 ## Arquivos deste repositório
 
+- `docs/HANDOFF.md` — **comece por aqui para continuar em outro PC**.
+- `docs/hdmi-stock-re.md` — engenharia reversa do HDMI stock.
+- `docs/h616_phy_tables.c` — tabela de referência extraída do stock.
+- `patches/` — patches de kernel (0003, 0005, 0006, 0010, 0011).
+- `dtb/` — DTS/DTB final da X96Q LPDDR3.
+- `artifacts/` — `.deb` do kernel/DTB prontos (não versionados no git).
+- `scripts/setup-host.sh` — Docker + qemu/binfmt + dtc.
+- `scripts/build-kernel.sh` — clona/atualiza `armbian-build` e compila.
+- `scripts/install-kernel-to-sd.sh` — instala kernel+DTB no SD pelo PC.
+- `tools/uart.py` / `tools/send_dtb.py` — UART e envio alternativo de DTB.
 - `scripts/expand-rootfs.sh` — expansão do rootfs (SD ou eMMC desmontado).
 - `scripts/emmc-install.sh` / `scripts/emmc-install.service` — legado; não usar.
 - `scripts/LEIA-ME-SD.txt` — resumo para o cartão SD.

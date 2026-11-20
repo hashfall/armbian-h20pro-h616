@@ -1,0 +1,4 @@
+# artefatos binarios grandes ficam no disco, nao no git
+artifacts/*.deb
+*.zip
+.ruff_cache/

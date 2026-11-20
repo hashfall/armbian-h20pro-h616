@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Local Debug <debug@localhost>
+Date: Fri, 20 Nov 2026 00:00:00 +0000
+Subject: [PATCH] drm: sun4i: hdmi phy: reset pulse + state dump
+
+Pulse the PHY reset at probe and dump the external PHY registers.
+
+Signed-off-by: Local Debug <debug@localhost>
+---
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -519,6 +519,12 @@
+ {
+ 	int ret;
+ 
++	/* Pulse the PHY reset: the bootloader may have left the PHY
++	 * configured (Android/BSP HDMI init), and a plain deassert does
++	 * not reset the block.
++	 */
++	reset_control_assert(phy->rst_phy);
++	udelay(10);
+ 	ret = reset_control_deassert(phy->rst_phy);
+ 	if (ret) {
+ 		dev_err(phy->dev, "Cannot deassert phy reset control: %d\n", ret);
+@@ -550,6 +556,19 @@
+ 
+ 	phy->variant->phy_init(phy);
+ 
++	{
++		u32 r0, r1, r2, r3, r4;
++
++		regmap_read(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG, &r0);
++		regmap_read(phy->regs, SUN8I_HDMI_PHY_ANA_CFG1_REG, &r1);
++		regmap_read(phy->regs, SUN8I_HDMI_PHY_ANA_CFG2_REG, &r2);
++		regmap_read(phy->regs, SUN8I_HDMI_PHY_ANA_CFG3_REG, &r3);
++		regmap_read(phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG, &r4);
++		dev_info(phy->dev,
++			 "PHY init state: rext=%08x ana1=%08x ana2=%08x ana3=%08x pll1=%08x\n",
++			 r0, r1, r2, r3, r4);
++	}
++
+ 	return 0;
+ 
+ err_disable_clk_mod:
+-- 
+2.51.0
