@@ -212,3 +212,40 @@ Log completo: `docs/logs/2026-11-20-pf987.md`.
 3. manter `0005`/`0006` e o debug `0010`.
 
 Não iniciar build até isso ser feito no PC mais potente.
+
+## 13. Continuar sem os arquivos grandes
+
+Sim. O repositório é autossuficiente para o trabalho de kernel/patches; os
+arquivos grandes são **regeneráveis ou dispensáveis**:
+
+| arquivo | tamanho | precisa? | como obter/regenerar |
+|---|---:|---|---|
+| `H20 PRO 5G_20240409.zip` | 1,24 GB | não para o passo atual | o que importava (tabelas phy301, sequência, JTAG) já está em `docs/` e nos patches `0005`/`0006`. Só volte a precisar se for extrair mais do BSP stock |
+| `artifacts/*.deb` | ~178 MB | não | `scripts/build-kernel.sh` recompila (rede + ~20–30 min + ~20 GB de disco) |
+| `armbian-build/` | 18 GB | não | o script clona `armbian/build` de novo e aplica os patches |
+| SD com Armbian | — | sim, para testar | use o SD atual ou grave de novo a imagem X96Q LPDDR3 |
+
+O firmware stock, se precisar, está publicado em sites de firmware
+(androidpctv, “Hongtop H20PRO H616”); confira o sha256 começando por
+`64ce8ddd…`. O kernel compilado no teste foi o stable `linux-6.18.y` commit
+`fd7cfd39c885`.
+
+**Receita em um PC novo (sem copiar nada grande):**
+
+```bash
+git clone https://github.com/hashfall/armbian-h20pro-h616
+cd armbian-h20pro-h616
+sudo ./scripts/setup-host.sh
+./scripts/build-kernel.sh          # clona ../armbian-build e compila
+sudo ./scripts/install-kernel-to-sd.sh /dev/mmcblk0p1
+```
+
+O que **não** é regenerável sozinho: o estado do SD (sistema já configurado,
+credenciais, rootfs expandido). Se o SD for perdido, grave a imagem Armbian
+X96Q LPDDR3 de novo e reaplique login/rootfs.
+
+Para repetir exatamente o build, fixe o commit do kernel:
+
+```bash
+KERNELBRANCH=commit:fd7cfd39c885 ./scripts/build-kernel.sh
+```
