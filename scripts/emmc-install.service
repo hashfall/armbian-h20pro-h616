@@ -1,9 +1,11 @@
+# LEGACY — o projeto atual e SD-only. Este servico apaga o eMMC e so roda
+# com o marcador explicito /boot/emmc-install/allow-emmc-install.
 [Unit]
-Description=Instala Armbian no eMMC a partir do cartao SD
-Documentation=file:/boot/emmc-install/README.txt
+Description=LEGACY: instala Armbian no eMMC (nao usar no fluxo SD-only)
+Documentation=file:/boot/emmc-install/LEIA-ME-SD.txt
 After=local-fs.target systemd-remount-fs.service
 Before=multi-user.target armbian-firstrun.service
-ConditionPathExists=/boot/emmc-install/enabled
+ConditionPathExists=/boot/emmc-install/allow-emmc-install
 ConditionPathExists=!/boot/emmc-install/done
 ConditionPathExists=!/boot/emmc-install/failed
 

@@ -1,46 +1,39 @@
-ARMBIAN H20 PRO (H616, 1 GB) - INSTALACAO AUTOMATICA NO eMMC
-================================================================
+ARMBIAN H20 PRO (H616) — BOOT PELO CARTAO SD
+============================================================
 
-Este SD inicia o Armbian e, no primeiro boot, APAGA TODO O eMMC,
-grava o Armbian e expande a particao. Depois desliga a caixa.
+Este cartao inicia o Armbian DIRETO DO SD. O eMMC nao e tocado.
+O objetivo e HDMI, Ethernet 100M, Wi-Fi/BT e USB funcionando.
 
-IMPORTANTE
-- Nao remova o SD antes de a caixa desligar sozinha.
-- Depois do sucesso, remova o SD e ligue a caixa pelo eMMC.
-- O processo apaga o eMMC inteiro, sem confirmacao.
+ANTES DE BOOTAR
+- Se existir /boot/emmc-install/enabled neste cartao, APAGUE.
+  Esse marcador pertence ao instalador antigo de eMMC, que apaga o eMMC.
+- Nao crie /boot/emmc-install/allow-emmc-install.
 
-LOGIN (depois de instalado)
+LOGIN
 - usuario: glenda
 - senha:   glenda
 - root:    glenda
 - console UART: ttyS0, 115200 8N1 (getty habilitado)
 
-LOGS NO SD
-- /boot/emmc-install/logs/install-XXX.log
-- /boot/emmc-install/logs/latest.log
-- /boot/emmc-install/RESULTADO.txt
-
-ESTADO
-- /boot/emmc-install/enabled  -> autoriza a instalacao
-- /boot/emmc-install/done     -> instalacao concluida
-- /boot/emmc-install/failed   -> houve falha (leia o log)
-
-SE FALHAR
-1. Leia o log no PC.
-2. Corrija o problema.
-3. Apague /boot/emmc-install/failed e ligue de novo com o SD.
-
-PARA REPETIR A INSTALACAO
-Apague done e failed no SD e ligue a caixa com o SD. Isso apaga o eMMC
-inteiro de novo.
-
-EXPANDIR A PARTICAO MANUALMENTE (se necessario)
-No Armbian instalado:
+EXPANDIR O ROOTFS DO SD
+    sudo ./scripts/expand-rootfs.sh
+ou, se o helper ja estiver instalado:
     sudo /usr/local/sbin/expand-rootfs.sh
-Pelo SD, com o eMMC desmontado (confira o dispositivo com lsblk):
-    sudo /usr/local/sbin/expand-rootfs.sh /dev/mmcblk2p1
 
-Imagem: Armbian Community 26.11.0 X96Q (H313/LPDDR3, 1/2 GB), Debian Trixie
-minimal, kernel 6.18.63, U-Boot 2026.10 (LPDDR3).
-Se o SD nao iniciar (sem U-Boot no UART), a DRAM/U-Boot nao casou com a
-caixa; a proxima tentativa e a imagem do Tanix TX6s (H616/DDR3).
+CONFIRMAR QUE ESTA NO SD
+    findmnt -no SOURCE /
+Esperado: /dev/mmcblk0p1 (SD).
+Se aparecer /dev/mmcblk2p1, voce esta no eMMC: pare.
+
+HDMI
+- Aplicar os patches 0005 e 0006 no build do kernel e atualizar o SD.
+- Sem EDID, testar com: video=HDMI-A-1:1024x768@60
+- Diagnostico: dmesg | grep -Ei 'hdmi|phy'
+
+REDE
+- Ethernet: gmac1 / AC300 (driver no kernel 6.18; validar DTS).
+- Wi-Fi/BT: UWE5622/AW859A (driver + firmware wcnmodem.bin + DTS).
+
+eMMC (LEGADO)
+- scripts/emmc-install.sh so roda com allow-emmc-install e APAGA o eMMC.
+- Nao use no fluxo normal. O projeto atual e SD-only.

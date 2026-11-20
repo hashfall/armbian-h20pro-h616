@@ -1,8 +1,11 @@
 #!/bin/bash
 # ---------------------------------------------------------------------------
-# emmc-install.sh
+# emmc-install.sh  (LEGACY)
 #
-# Executado automaticamente no primeiro boot do cartao SD.
+# O projeto atual e SD-only: o Armbian roda direto do cartao SD e o eMMC
+# NAO deve ser tocado. Este instalador continua no repositorio apenas para
+# recuperacao explicita e APAGA o eMMC inteiro.
+#
 #   1. apaga completamente o eMMC (tabela de particoes + dados);
 #   2. grava a imagem Armbian que esta em /root/armbian-install.img;
 #   3. expande a particao e o filesystem para ocupar todo o eMMC;
@@ -13,12 +16,12 @@
 # O conteudo do cartao SD nao e apagado: o script apenas grava logs e
 # marcadores nele. O cartao SD NAO e formatado.
 # Ele so roda quando o sistema foi iniciado pelo SD e existe o marcador
-# /boot/emmc-install/enabled.
+# explicito /boot/emmc-install/allow-emmc-install.
 # ---------------------------------------------------------------------------
 set -Eeuo pipefail
 
 MARKER_DIR=/boot/emmc-install
-ENABLED="$MARKER_DIR/enabled"
+ENABLED="$MARKER_DIR/allow-emmc-install"
 DONE="$MARKER_DIR/done"
 FAILED="$MARKER_DIR/failed"
 LOG_DIR="$MARKER_DIR/logs"
@@ -78,7 +81,10 @@ if [[ -e "$FAILED" ]]; then
 	exit 0
 fi
 if [[ ! -e "$ENABLED" ]]; then
-	log "Marcador $ENABLED ausente; instalador ignorado."
+	if [[ -e "$MARKER_DIR/enabled" ]]; then
+		log "AVISO: marcador antigo 'enabled' ignorado; este instalador legado exige 'allow-emmc-install'."
+	fi
+	log "Marcador $ENABLED ausente; instalador legado ignorado."
 	exit 0
 fi
 

@@ -1,127 +1,122 @@
-# Armbian H20 Pro (Allwinner H616, 1 GB) — instalação automática no eMMC
+# Armbian H20 Pro (Allwinner H616) — boot pelo cartão SD
 
-Cartão SD preparado para:
+Objetivo: **Armbian totalmente funcional a partir do cartão SD**, com HDMI,
+Ethernet 100M, Wi-Fi/BT e USB. O **eMMC fica intocado**; este projeto não
+instala mais o sistema no eMMC.
 
-1. iniciar o Armbian pelo SD na TV Box;
-2. apagar completamente o eMMC (sem deixar partições do Android);
-3. gravar o Armbian no eMMC;
-4. expandir a partição/filesystem para ocupar todo o eMMC;
-5. criar o usuário **glenda** com senha **glenda**;
-6. salvar os logs no próprio SD e desligar a caixa.
+## Base usada
 
-O script só roda quando o sistema foi iniciado pelo **SD** e existe o marcador
-`/boot/emmc-install/enabled`. Ele nunca apaga o cartão SD; as únicas escritas
-no SD são os logs e os marcadores de estado.
+- Armbian Community X96Q (sun50iw9 / Allwinner H313, LPDDR3)
+- Debian Trixie minimal, kernel 6.18.x `current-sunxi64`
+- U-Boot do Armbian com LPDDR3
 
-## Imagem usada
+A imagem do **X96 Mate** (H616 + DDR3 1333) não treina a DRAM desta caixa:
+o SPL para em `This DRAM setup is currently not supported.` e reinicia em
+loop. Use a variante **X96Q LPDDR3**.
 
-- Armbian Community 26.11.0-trunk.130
-- Board: **X96Q TV Box** (sun50iw9 / Allwinner H313, LPDDR3, 1/2 GB, eMMC)
-- Debian Trixie, kernel 6.18.63-current-sunxi64, variante **minimal**
-- U-Boot 2026.10 com LPDDR3
+## Gravar e iniciar pelo SD
 
-A primeira tentativa usou a imagem do **X96 Mate** (H616 + DDR3 1333), mas o
-SPL parou em `This DRAM setup is currently not supported.` e reiniciou em loop,
-sem tocar no eMMC. Para uma caixa de 1 GB, a configuração LPDDR3 do X96Q é a
-candidata mais provável. Se ela também não inicializar, a próxima é a do
-**Tanix TX6s** (H616 + DDR3).
+1. Grave a imagem em um cartão **genuíno** (Balena Etcher ou `dd`).
+2. Antes de bootar, confira se o SD **não** tem
+   `/boot/emmc-install/enabled`. Esse marcador pertence ao instalador antigo
+   de eMMC; se existir, remova. O instalador legado apaga o eMMC.
+3. Boote a caixa com o SD. Console UART: `ttyS0`, **115200 8N1**.
+4. Login: usuário `glenda`, senha `glenda` (troque depois).
+5. Expanda o rootfs do SD:
 
-## O que acontece no primeiro boot pelo SD
+   ```bash
+   sudo ./scripts/expand-rootfs.sh
+   ```
 
-O serviço `emmc-install.service` roda antes do `multi-user.target`:
+   Se o helper já estiver instalado na imagem, também vale
+   `sudo /usr/local/sbin/expand-rootfs.sh`.
 
-1. confere o checksum da imagem em `/root/armbian-install.img`;
-2. localiza o eMMC (dispositivo MMC que não é o SD de boot);
-3. apaga `wipefs` + `blkdiscard` + início/fim do dispositivo;
-4. grava a imagem com `dd` (U-Boot, kernel, DTB e rootfs);
-5. confere o SHA256 do que foi gravado;
-6. expande a partição 1 e o ext4 até o fim do eMMC;
-7. troca o UUID do rootfs do eMMC e atualiza `armbianEnv.txt`/`fstab`;
-8. remove o instalador da cópia do eMMC (para não rodar de novo);
-9. grava `RESULTADO.txt` e `done` no SD, dá `sync` e desliga a caixa.
+6. Confirme que o sistema está no SD:
 
-Enquanto roda, o progresso aparece no UART (115200 8N1) e no HDMI.
+   ```bash
+   findmnt -no SOURCE /
+   # esperado: /dev/mmcblk0p1 (SD)
+   # se aparecer /dev/mmcblk2p1, você está no eMMC: pare
+   ```
 
-## Depois da instalação
+## Estado do port
 
-1. Espere a caixa desligar sozinha.
-2. **Remova o cartão SD.**
-3. Ligue a caixa: ela deve iniciar pelo eMMC.
-4. Login no console UART/HDMI:
-   - usuário: `glenda`
-   - senha: `glenda`
-   - root: `glenda` (emergência)
+| Bloco | Situação |
+|---|---|
+| Boot pelo SD | funciona com a imagem X96Q LPDDR3 |
+| HDMI | em ajuste; aplicar patches 0005/0006 (ver abaixo) |
+| Ethernet 100M | driver AC300/EMAC1 já está no kernel 6.18; validar DTS |
+| Wi-Fi/BT | driver UWE5622 disponível; falta firmware + nós DTS |
+| eMMC | intocado por decisão de projeto |
 
-O getty serial em `ttyS0` já vem habilitado.
+## Kernel, DTB e HDMI
 
-## Logs no SD
+O build do kernel fica no diretório irmão `../armbian-build/`:
 
-O cartão SD guarda tudo em:
+- patches de kernel: `../armbian-build/userpatches/kernel/sunxi-6.18/`
+- já existem lá: `0003-drm-sun4i-tcon-pad-select.patch` e
+  `0004-drm-sun4i-h616-hdmi-phy.patch`
+- os patches deste repositório (`patches/0005` e `patches/0006`) ainda
+  precisam ser copiados para essa pasta antes de compilar
 
-```
-/boot/emmc-install/
-├── enabled              # marcador que autoriza a instalação (não apague durante o processo)
-├── done                 # criado no sucesso
-├── failed               # criado em caso de falha
-├── RESULTADO.txt        # resumo: dispositivo, partição, UUID, tabela, blkid
-└── logs/
-    ├── install-001.log
-    ├── install-002.log
-    └── latest.log -> install-00N.log
-```
+Ordem: **0003 → 0004 → 0005 → 0006**.
 
-Para ler no PC, monte a partição ext4 do SD e abra `boot/emmc-install/logs/`.
+- `0005` substitui as tabelas H616 pelas 97 entradas extraídas do Android
+  stock (PHY phy301).
+- `0006` seleciona a interface I2C do PHY (`JTAG_PHY_CONFIG = 0x10`), que o
+  stock escreve antes de cada configuração. É o candidato principal para o
+  erro `PHY PLL failed to lock`.
+- `0006` só atua se o nó HDMI mantiver o compatible
+  `allwinner,sun50i-h616-dw-hdmi`.
 
-### Se falhar
+Detalhes da engenharia reversa: `docs/hdmi-stock-re.md`.
+Tabela extraída: `docs/h616_phy_tables.c` (referência gerada; o patch real é
+o `0005`).
 
-- A caixa **não** desliga; o UART continua mostrando o console.
-- O arquivo `failed` impede novas tentativas automáticas (evita boot loop).
-- Leia o log, corrija o problema e apague `failed` para tentar de novo.
-- Se o eMMC ficou parcialmente gravado, a próxima execução apaga tudo outra vez.
+## Ethernet e Wi-Fi
 
-### Para repetir a instalação
+- **Ethernet:** `gmac1` em `0x05030000`, RMII, PHY interno **AC300**.
+  O kernel 6.18 já tem `ac300-phy.c` e o variante H616 do `dwmac-sun8i`.
+  Para o X96Q (mesmo AC300/EMAC1), a receita é PWM5 em 2 MHz no PA12,
+  calibration do eFUSE, `mdio-mux` e nó AC300. Confirme pinos/calibração na
+  H20 Pro antes de copiar o DTS.
+- **Wi-Fi/BT:** **UWE5622 / AW859A** via SDIO (`sprd,marlin3`).
+  Use o driver `uwe5622` da Armbian (ou `uwe5622-ng`) e os blobs do firmware
+  stock (`wcnmodem.bin`, `wifi_2355b001_1ant.ini`). O DTS precisa do SDIO,
+  `mmc-pwrseq` e do nó `uwe-bsp`.
 
-Apague `done` e `failed` no SD e ligue a caixa com o SD. A imagem será gravada
-de novo. **Isso apaga o eMMC inteiro.**
+Não use a imagem/DTB do T95: a RAM (DDR3 vs LPDDR3), o PMIC (AXP305 vs
+AXP313a) e a pinagem são diferentes. Os drivers são reaproveitáveis; o DTB
+não é.
 
-## Expansão manual (se precisar)
-
-A expansão já é feita pelo instalador. Se em algum momento precisar repetir:
-
-No sistema instalado (online):
-
-```bash
-sudo /usr/local/sbin/expand-rootfs.sh
-```
-
-Ou, inicializando pelo SD, para arrumar o eMMC desmontado:
+## Verificação
 
 ```bash
-sudo /usr/local/sbin/expand-rootfs.sh /dev/mmcblk2p1
+findmnt -no SOURCE /
+dmesg | grep -Ei 'hdmi|phy|dwmac|ac300|uwe|sprd'
+cat /sys/class/drm/card*-HDMI-A-1/status
+ip link
+iw dev
 ```
 
-Confira o dispositivo correto com `lsblk` antes.
+Para testar HDMI sem EDID, force no cmdline:
 
-Comandos manuais equivalentes (eMMC desmontado, ex.: `/dev/mmcblk2`):
-
-```bash
-sudo parted -s -f /dev/mmcblk2 resizepart 1 100%
-sudo partx -u /dev/mmcblk2
-sudo e2fsck -f -y /dev/mmcblk2p1
-sudo resize2fs /dev/mmcblk2p1
+```text
+video=HDMI-A-1:1024x768@60
 ```
+
+## eMMC (legado, não usar)
+
+Os arquivos `scripts/emmc-install.sh` e `scripts/emmc-install.service`
+continuam no repositório apenas como legado de recuperação. Eles **apagam o
+eMMC inteiro** e agora só rodam com o marcador explícito
+`/boot/emmc-install/allow-emmc-install`; não crie esse marcador no fluxo
+normal. Em um SD antigo, remova `/boot/emmc-install/enabled` antes de bootar.
 
 ## Arquivos deste repositório
 
-- `scripts/emmc-install.sh` — instalador que roda no SD.
-- `scripts/emmc-install.service` — unidade systemd que dispara o instalador.
-- `scripts/expand-rootfs.sh` — helper de expansão online/offline.
-- `scripts/LEIA-ME-SD.txt` — cópia resumida colocada no SD.
-
-## Avisos
-
-- O processo **apaga o eMMC inteiro**. Não há confirmação interativa.
-- O SD é a fonte da imagem; não o remova antes do poweroff.
-- Depois do sucesso, remova o SD antes de ligar de novo; o BootROM do H616
-  prefere o SD ao eMMC.
-- A senha `glenda` é fraca; troque com `passwd` depois de validar a instalação.
+- `scripts/expand-rootfs.sh` — expansão do rootfs (SD ou eMMC desmontado).
+- `scripts/emmc-install.sh` / `scripts/emmc-install.service` — legado; não usar.
+- `scripts/LEIA-ME-SD.txt` — resumo para o cartão SD.
+- `docs/hdmi-stock-re.md` — engenharia reversa do HDMI stock.
+- `patches/0005-*.patch` / `patches/0006-*.patch` — correções de HDMI.
