@@ -182,3 +182,33 @@ cat /sys/class/drm/card0-HDMI-A-1/status
 para confirmar se o PLL travou com as tabelas stock + select I2C/JTAG.
 
 **Regra:** não iniciar outro build até registrar/avaliar este resultado.
+
+## 12. Resultado do build Pf987 (lido do box em 2026-11-20)
+
+Log completo: `docs/logs/2026-11-20-pf987.md`.
+
+- `uname -r` = `6.18.64-current-sunxi64`; root = `/dev/mmcblk0p1` (SD);
+  DTB md5 = `b0b99939…`; HDMI `connected`; EDID = 0 bytes.
+- **Patch 0005 aplicado**: readback da PHY mudou de
+  `06=0040 09=8039 0e=022b 10=0019` para
+  `06=0051 09=8009 0e=0230 10=001b`.
+- **Patch 0006 aplicado** (JTAG/I2C) e **não resolveu**.
+- I2C da PHY funciona: o readback devolve exatamente os valores escritos.
+- PLL continua sem travar (100 × 5 ms) em 172,78 MHz:
+  `stat0=00`, `conf0=2e`.
+- **O pulso de reset (0011) não foi aplicado**: `reset_control_assert()`
+  dispara `WARNING ... reset/core.c:483` porque o bootloader deixou o reset
+  deassertado e o driver nunca chamou `deassert()` (contador 0). Os
+  registradores externos da PHY seguem iguais aos do bootloader
+  (`ana1=00000f80 ana2=0c0040d8 ana3=02700203 pll1=000c6023`).
+
+**Próximo build (em PC mais potente):**
+
+1. corrigir o reset: `deassert()` antes de `assert()` (ou
+   `reset_control_reset()`), para realmente pulsar a PHY;
+2. se ainda falhar, `configure_phy` específico de H616 fiel ao stock:
+   não escrever 0x13/0x05, alternar SVSRET por modo e usar
+   `MSM_CTRL=0x8006` em 594 MHz (`docs/hdmi-stock-re.md` §6);
+3. manter `0005`/`0006` e o debug `0010`.
+
+Não iniciar build até isso ser feito no PC mais potente.
